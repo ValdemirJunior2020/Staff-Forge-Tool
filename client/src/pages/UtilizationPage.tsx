@@ -530,7 +530,7 @@ export default function UtilizationPage() {
           </div>
         </div>
 
-        <div className="max-h-[520px] overflow-auto">
+       <div className="max-h-130 overflow-auto">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 bg-slate-100 text-slate-600">
               <tr>

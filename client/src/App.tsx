@@ -23,7 +23,7 @@ const ENTRY_GIF =
 function CommandCenterEntryLoader() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="rounded-[2rem] border border-slate-200 bg-white p-8 text-center shadow-2xl">
+      <div className="rounded-4xl border border-slate-200 bg-white p-8 text-center shadow-2xl">
         <img
           src={ENTRY_GIF}
           alt="Loading command center"
@@ -113,6 +113,7 @@ export default function App() {
 
     if (sessionId && previousSessionIdRef.current !== sessionId) {
       setShowEntryLoader(true);
+
       timer = window.setTimeout(() => {
         setShowEntryLoader(false);
       }, 2400);
@@ -125,7 +126,9 @@ export default function App() {
     previousSessionIdRef.current = sessionId;
 
     return () => {
-      if (timer) window.clearTimeout(timer);
+      if (timer) {
+        window.clearTimeout(timer);
+      }
     };
   }, [sessionId]);
 
