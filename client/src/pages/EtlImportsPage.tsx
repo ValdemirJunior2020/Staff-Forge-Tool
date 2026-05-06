@@ -1,12 +1,13 @@
 // client/src/pages/EtlImportsPage.tsx
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   Database,
   Download,
   ExternalLink,
+  Eye,
   FileSpreadsheet,
   RefreshCw,
   ShieldCheck,
@@ -85,7 +86,7 @@ const requiredTabs: Omit<TabStatus, "status" | "rows" | "message">[] = [
 
 function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   const csv = [
-    headers.join(","),
+    headers.map((header) => `"${header}"`).join(","),
     ...rows.map((row) =>
       row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
     ),
@@ -97,12 +98,30 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
 
   URL.revokeObjectURL(url);
 }
 
+function getStatusStyles(status: TabStatus["status"]) {
+  if (status === "healthy") return "bg-green-50 text-green-700";
+  if (status === "empty") return "bg-yellow-50 text-yellow-700";
+  if (status === "missing") return "bg-red-50 text-red-700";
+  return "bg-blue-50 text-blue-700";
+}
+
+function getStatusIcon(status: TabStatus["status"]) {
+  if (status === "healthy") return <CheckCircle2 size={14} />;
+  if (status === "empty") return <AlertTriangle size={14} />;
+  if (status === "missing") return <XCircle size={14} />;
+  return <RefreshCw size={14} />;
+}
+
 export default function EtlImportsPage() {
+  const previewRef = useRef<HTMLDivElement | null>(null);
+
   const [tabs, setTabs] = useState<TabStatus[]>(
     requiredTabs.map((tab) => ({
       ...tab,
@@ -116,9 +135,11 @@ export default function EtlImportsPage() {
   const [selectedTab, setSelectedTab] = useState<string>("Agents_Master");
   const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [notice, setNotice] = useState("");
 
   async function scanTabs() {
     setLoading(true);
+    setNotice("Scanning Google Sheet tabs...");
 
     const results: TabStatus[] = [];
 
@@ -157,11 +178,19 @@ export default function EtlImportsPage() {
 
     setTabs(results);
 
+    const healthyTabs = results.filter((tab) => tab.status === "healthy").length;
+    const emptyTabs = results.filter((tab) => tab.status === "empty").length;
+    const missingTabs = results.filter((tab) => tab.status === "missing").length;
+
+    setNotice(
+      `Scan complete: ${healthyTabs} healthy tabs, ${emptyTabs} empty tabs, ${missingTabs} missing tabs.`
+    );
+
     await trackEvent("etl_import_scan_completed", {
       tabsScanned: results.length,
-      healthyTabs: results.filter((tab) => tab.status === "healthy").length,
-      emptyTabs: results.filter((tab) => tab.status === "empty").length,
-      missingTabs: results.filter((tab) => tab.status === "missing").length,
+      healthyTabs,
+      emptyTabs,
+      missingTabs,
     });
 
     setLoading(false);
@@ -169,20 +198,42 @@ export default function EtlImportsPage() {
 
   async function loadPreview(tabName: string) {
     setSelectedTab(tabName);
+    setPreviewRows([]);
     setPreviewLoading(true);
+    setNotice(`Loading preview for ${tabName}...`);
 
     try {
       const rows = await getGoogleSheetRows<Record<string, unknown>>(tabName);
-      setPreviewRows(rows.slice(0, 25));
+      const limitedRows = rows.slice(0, 25);
+
+      setPreviewRows(limitedRows);
+
+      if (rows.length > 0) {
+        setNotice(
+          `Preview loaded for ${tabName}: showing ${limitedRows.length} of ${rows.length} rows.`
+        );
+      } else {
+        setNotice(
+          `${tabName} exists, but it does not have rows yet. Add data in Google Sheets to populate this preview.`
+        );
+      }
 
       await trackEvent("etl_tab_preview_loaded", {
         tabName,
-        previewRows: rows.slice(0, 25).length,
+        previewRows: limitedRows.length,
         totalRows: rows.length,
       });
+
+      setTimeout(() => {
+        previewRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
     } catch (error) {
       console.error(`Preview failed for ${tabName}:`, error);
       setPreviewRows([]);
+      setNotice(`Could not preview ${tabName}. Check the tab name in Google Sheets.`);
     } finally {
       setPreviewLoading(false);
     }
@@ -207,11 +258,10 @@ export default function EtlImportsPage() {
 
   const previewHeaders = useMemo(() => {
     if (previewRows.length === 0) return [];
-
     return Object.keys(previewRows[0]);
   }, [previewRows]);
 
-  function exportStatus() {
+  async function exportStatus() {
     downloadCsv(
       "staffforge-etl-import-status.csv",
       ["Tab", "Required", "Status", "Rows", "Purpose", "Message"],
@@ -224,42 +274,21 @@ export default function EtlImportsPage() {
         tab.message,
       ])
     );
+
+    setNotice("ETL status CSV downloaded.");
+
+    await trackEvent("etl_status_exported", {
+      tabs: tabs.length,
+      totalRows: totals.totalRows,
+    });
   }
 
-  function statusBadge(tab: TabStatus) {
-    if (tab.status === "healthy") {
-      return (
-        <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-700">
-          <CheckCircle2 size={14} />
-          Healthy
-        </span>
-      );
-    }
+  async function openGoogleSheet() {
+    await trackEvent("etl_google_sheet_opened", {
+      source: "Staff-Forge Tool Google Sheet",
+    });
 
-    if (tab.status === "empty") {
-      return (
-        <span className="inline-flex items-center gap-2 rounded-full bg-yellow-50 px-3 py-1 text-xs font-black text-yellow-700">
-          <AlertTriangle size={14} />
-          Empty
-        </span>
-      );
-    }
-
-    if (tab.status === "missing") {
-      return (
-        <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">
-          <XCircle size={14} />
-          Missing
-        </span>
-      );
-    }
-
-    return (
-      <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-        <RefreshCw size={14} />
-        Checking
-      </span>
-    );
+    window.open(GOOGLE_SHEET_URL, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -274,8 +303,9 @@ export default function EtlImportsPage() {
         </h2>
 
         <p className="mt-4 max-w-4xl text-slate-300">
-          This page verifies the StaffForge Google Sheet tabs that feed the
-          dashboard, utilization engine, forecasting, and audit-ready reports.
+          This page verifies that StaffForge can read each Google Sheet tab used
+          by the dashboard, agent database, utilization engine, forecasting, and
+          reports.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -297,22 +327,28 @@ export default function EtlImportsPage() {
             Export Status
           </button>
 
-          <a
-            href={GOOGLE_SHEET_URL}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() =>
-              trackEvent("etl_google_sheet_opened", {
-                source: "Staff-Forge Tool Google Sheet",
-              })
-            }
+          <button
+            type="button"
+            onClick={openGoogleSheet}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-yellow-300 bg-yellow-400 px-5 py-3 font-black text-slate-950 shadow-lg shadow-yellow-500/30 transition hover:scale-[1.02] hover:bg-yellow-300"
           >
             <ExternalLink size={18} />
             Open StaffForge Google Sheet
-          </a>
+          </button>
         </div>
       </section>
+
+      {notice && (
+        <section className="rounded-3xl border border-green-200 bg-green-50 p-5 text-green-900">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-1 text-green-700" />
+            <div>
+              <h3 className="font-black">Action Result</h3>
+              <p className="mt-1 text-sm leading-6">{notice}</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-4 md:grid-cols-5">
         <div className="sf-card p-5">
@@ -352,12 +388,12 @@ export default function EtlImportsPage() {
         <div className="flex items-start gap-3">
           <UploadCloud className="mt-1 text-blue-700" />
           <div>
-            <h3 className="text-lg font-black">Import Status</h3>
+            <h3 className="text-lg font-black">Purpose of This Page</h3>
             <p className="mt-1 text-sm leading-6">
-              StaffForge is currently using Google Sheets as the live data
-              source. A tab marked <b>Healthy</b> means the app can read it and
-              found rows. A tab marked <b>Empty</b> means the tab exists but
-              needs data. Required tabs should stay healthy.
+              This is not where you manually upload files yet. This page checks
+              the live Google Sheet used by StaffForge and confirms which tabs
+              are ready, empty, or missing. Use <b>Preview</b> to inspect the
+              data feeding each module.
             </p>
           </div>
         </div>
@@ -389,15 +425,25 @@ export default function EtlImportsPage() {
                 <tr key={tab.tabName} className="border-t border-slate-100">
                   <td className="p-4 font-black">{tab.tabName}</td>
                   <td className="p-4">{tab.required ? "Yes" : "No"}</td>
-                  <td className="p-4">{statusBadge(tab)}</td>
+                  <td className="p-4">
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black ${getStatusStyles(
+                        tab.status
+                      )}`}
+                    >
+                      {getStatusIcon(tab.status)}
+                      {tab.status.toUpperCase()}
+                    </span>
+                  </td>
                   <td className="p-4 font-black">{tab.rows}</td>
                   <td className="p-4">{tab.purpose}</td>
                   <td className="p-4">
                     <button
                       type="button"
                       onClick={() => loadPreview(tab.tabName)}
-                      className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white hover:bg-blue-700"
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white hover:bg-blue-700"
                     >
+                      <Eye size={14} />
                       Preview
                     </button>
                   </td>
@@ -408,26 +454,47 @@ export default function EtlImportsPage() {
         </div>
       </section>
 
-      <section className="sf-card overflow-hidden">
+      <section ref={previewRef} className="sf-card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-xl font-black">Preview: {selectedTab}</h3>
+            <h3 className="text-xl font-black">
+              Preview Data: {selectedTab}
+            </h3>
             <p className="text-sm text-slate-500">
-              First 25 rows from the selected Google Sheet tab.
+              This preview shows the first 25 rows from the selected Google
+              Sheet tab.
             </p>
           </div>
 
-          {previewLoading && (
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
-              Loading preview...
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {previewLoading && (
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+                Loading preview...
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => loadPreview(selectedTab)}
+              className="sf-button sf-secondary"
+            >
+              <RefreshCw size={18} />
+              Reload Preview
+            </button>
+          </div>
         </div>
 
         <div className="max-h-130 overflow-auto">
           {previewRows.length === 0 ? (
-            <div className="p-8 text-center font-semibold text-slate-500">
-              No preview rows found for this tab.
+            <div className="p-8 text-center">
+              <Table2 className="mx-auto mb-3 text-slate-400" size={36} />
+              <h3 className="text-lg font-black text-slate-800">
+                No preview rows found
+              </h3>
+              <p className="mt-2 text-sm font-semibold text-slate-500">
+                The selected tab is empty or could not be read. Open the Google
+                Sheet and add rows to this tab.
+              </p>
             </div>
           ) : (
             <table className="w-full text-left text-xs">
