@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  ArrowDownRight,
   ArrowUpRight,
   Clock,
   Download,
   FileSpreadsheet,
   RefreshCw,
+  Search,
+  ShieldCheck,
   Users,
 } from "lucide-react";
 import { trackEvent } from "../lib/firebase";
@@ -68,10 +69,19 @@ function getRisk(utilization: number, idleHours: number): string {
   return "Monitor";
 }
 
+function getRiskClass(risk: string): string {
+  if (risk === "Healthy") return "bg-green-50 text-green-700";
+  if (risk === "High idle risk") return "bg-red-50 text-red-700";
+  if (risk === "Idle watch") return "bg-orange-50 text-orange-700";
+  return "bg-blue-50 text-blue-700";
+}
+
 export default function UtilizationPage() {
   const [rows, setRows] = useState<UtilizationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");
+  const [search, setSearch] = useState("");
+  const [showAllRows, setShowAllRows] = useState(false);
 
   async function loadUtilization() {
     setLoading(true);
@@ -143,25 +153,55 @@ export default function UtilizationPage() {
       }
     });
 
-    return Array.from(grouped.entries()).map(([vendor, data]) => {
-      const utilization =
-        data.utilizationCount > 0
-          ? data.utilizationTotal / data.utilizationCount
-          : data.scheduledHours > 0
-          ? (data.productiveHours / data.scheduledHours) * 100
-          : 0;
+    return Array.from(grouped.entries())
+      .map(([vendor, data]) => {
+        const utilization =
+          data.utilizationCount > 0
+            ? data.utilizationTotal / data.utilizationCount
+            : data.scheduledHours > 0
+            ? (data.productiveHours / data.scheduledHours) * 100
+            : 0;
 
-      return {
-        vendor,
-        agents: data.agentIds.size,
-        scheduledHours: data.scheduledHours,
-        productiveHours: data.productiveHours,
-        idleHours: data.idleHours,
-        utilization,
-        risk: getRisk(utilization, data.idleHours),
-      };
-    });
+        return {
+          vendor,
+          agents: data.agentIds.size,
+          scheduledHours: data.scheduledHours,
+          productiveHours: data.productiveHours,
+          idleHours: data.idleHours,
+          utilization,
+          risk: getRisk(utilization, data.idleHours),
+        };
+      })
+      .sort((a, b) => b.idleHours - a.idleHours);
   }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const query = search.toLowerCase().trim();
+
+    if (!query) return rows;
+
+    return rows.filter((row) => {
+      const searchableText = [
+        row.date,
+        row.agent_id,
+        row.full_name,
+        row.vendor,
+        row.scheduled_hours,
+        row.productive_hours,
+        row.available_hours,
+        row.idle_hours,
+        row.break_hours,
+        row.calls_handled,
+        row.utilization_percent,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [rows, search]);
+
+  const visibleRows = showAllRows ? filteredRows : filteredRows.slice(0, 25);
 
   const totalAgents = useMemo(() => {
     const agentIds = new Set(
@@ -179,6 +219,11 @@ export default function UtilizationPage() {
   const bestVendor =
     vendorSummaries.length > 0
       ? [...vendorSummaries].sort((a, b) => b.utilization - a.utilization)[0]
+      : null;
+
+  const highestRiskVendor =
+    vendorSummaries.length > 0
+      ? [...vendorSummaries].sort((a, b) => b.idleHours - a.idleHours)[0]
       : null;
 
   const riskAlerts = vendorSummaries.filter(
@@ -232,10 +277,11 @@ export default function UtilizationPage() {
     await trackEvent("utilization_create_action_clicked", {
       riskAlerts,
       idleHours: totalIdleHours,
+      highestRiskVendor: highestRiskVendor?.vendor || "N/A",
     });
 
     alert(
-      "Action created: Review vendors with high idle risk and compare staffing against call volume."
+      `Action created: Review ${highestRiskVendor?.vendor || "vendors"} first because this vendor has the highest idle-hour exposure in the current data.`
     );
   }
 
@@ -369,11 +415,34 @@ export default function UtilizationPage() {
         </div>
       </section>
 
+      <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-950">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-1 text-blue-700" />
+          <div>
+            <h3 className="text-lg font-black">Operational Insight</h3>
+            <p className="mt-1 text-sm leading-6">
+              StaffForge loaded <b>{rows.length}</b> utilization records from
+              Google Sheets and grouped them by vendor. The summary below is for
+              executive review. The detailed records table shows the individual
+              rows behind the calculation.
+            </p>
+
+            {highestRiskVendor && (
+              <p className="mt-2 text-sm leading-6">
+                Current priority: <b>{highestRiskVendor.vendor}</b> has the
+                highest idle-hour exposure with{" "}
+                <b>{formatNumber(highestRiskVendor.idleHours)}</b> idle hours.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="sf-card overflow-hidden">
         <div className="border-b border-slate-200 p-5">
           <h3 className="text-xl font-black">Vendor Utilization Overview</h3>
           <p className="text-sm text-slate-500">
-            Loaded rows from Google Sheet: {rows.length}
+            Executive summary grouped by vendor.
           </p>
         </div>
 
@@ -404,13 +473,9 @@ export default function UtilizationPage() {
                   </td>
                   <td className="p-4">
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${
-                        row.risk === "Healthy"
-                          ? "bg-green-50 text-green-700"
-                          : row.risk === "High idle risk"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-blue-50 text-blue-700"
-                      }`}
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${getRiskClass(
+                        row.risk
+                      )}`}
                     >
                       {row.risk}
                     </span>
@@ -424,8 +489,8 @@ export default function UtilizationPage() {
                     className="p-6 text-center font-semibold text-slate-500"
                     colSpan={7}
                   >
-                    No utilization data found. Make sure your Google Sheet has a
-                    tab named Utilization_Daily.
+                    No utilization data found. Confirm that the Google Sheet has
+                    a tab named Utilization_Daily.
                   </td>
                 </tr>
               )}
@@ -434,18 +499,103 @@ export default function UtilizationPage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 text-orange-900">
-        <div className="flex items-start gap-3">
-          <ArrowDownRight />
+      <section className="sf-card overflow-hidden">
+        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="font-black">What should happen here?</h3>
-            <p className="mt-1 text-sm">
-              This page should show real vendor utilization from your Google
-              Sheet. Click <b>Refresh Data</b>. If the table stays empty, your
-              Apps Script URL is working but the tab name or column headers do
-              not match.
+            <h3 className="text-xl font-black">Detailed Utilization Records</h3>
+            <p className="text-sm text-slate-500">
+              Showing {visibleRows.length} of {filteredRows.length} matching
+              rows. Total loaded rows: {rows.length}.
             </p>
           </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <Search size={18} className="text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search vendor, agent, ID, date..."
+                className="w-full outline-none"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAllRows((current) => !current)}
+              className="sf-button sf-secondary"
+            >
+              {showAllRows ? "Show Less" : "Show All Rows"}
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[520px] overflow-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 bg-slate-100 text-slate-600">
+              <tr>
+                <th className="p-4">Date</th>
+                <th className="p-4">Agent ID</th>
+                <th className="p-4">Agent Name</th>
+                <th className="p-4">Vendor</th>
+                <th className="p-4">Scheduled</th>
+                <th className="p-4">Productive</th>
+                <th className="p-4">Available</th>
+                <th className="p-4">Idle</th>
+                <th className="p-4">Break</th>
+                <th className="p-4">Calls</th>
+                <th className="p-4">Utilization</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {visibleRows.map((row, index) => (
+                <tr
+                  key={`${row.agent_id || row.full_name || "row"}-${index}`}
+                  className="border-t border-slate-100"
+                >
+                  <td className="p-4">{row.date || "-"}</td>
+                  <td className="p-4">{row.agent_id || "-"}</td>
+                  <td className="p-4 font-semibold">
+                    {row.full_name || "Unnamed Agent"}
+                  </td>
+                  <td className="p-4 font-black">{row.vendor || "Unknown"}</td>
+                  <td className="p-4">
+                    {formatNumber(toNumber(row.scheduled_hours))}
+                  </td>
+                  <td className="p-4">
+                    {formatNumber(toNumber(row.productive_hours))}
+                  </td>
+                  <td className="p-4">
+                    {formatNumber(toNumber(row.available_hours))}
+                  </td>
+                  <td className="p-4">
+                    {formatNumber(toNumber(row.idle_hours))}
+                  </td>
+                  <td className="p-4">
+                    {formatNumber(toNumber(row.break_hours))}
+                  </td>
+                  <td className="p-4">
+                    {formatNumber(toNumber(row.calls_handled))}
+                  </td>
+                  <td className="p-4 font-black">
+                    {toNumber(row.utilization_percent).toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+
+              {visibleRows.length === 0 && (
+                <tr>
+                  <td
+                    className="p-6 text-center font-semibold text-slate-500"
+                    colSpan={11}
+                  >
+                    No detailed rows match your search.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
