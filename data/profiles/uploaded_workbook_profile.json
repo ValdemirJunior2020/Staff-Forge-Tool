@@ -1,0 +1,482 @@
+[
+  {
+    "file_name": "WNS Agents.xlsx",
+    "sheets": [
+      {
+        "sheet": "Active agents",
+        "detected_headers": [
+          "Wave ",
+          "Start Date",
+          "Task / Position",
+          "First Name",
+          "Last Name",
+          "Supervisor",
+          "Email",
+          "ID*",
+          "HP Password*",
+          "Remarks",
+          "Billable Hour Yes/No",
+          "Admin Access",
+          "Production Start Date",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 238
+      },
+      {
+        "sheet": "Inactive agents",
+        "detected_headers": [
+          "Wave ",
+          "Start Date",
+          "Task / Position",
+          "First Name",
+          "Last Name",
+          "Email",
+          "Supervisor",
+          "ID*",
+          "HP Password*",
+          "Remarks",
+          "Billable Hour Yes/No",
+          "Admin Access",
+          "Production Start Date"
+        ],
+        "non_empty_rows": 164
+      },
+      {
+        "sheet": "Agent Level",
+        "detected_headers": [
+          "Agent Names",
+          "WNS Email Address",
+          "Supervisor"
+        ],
+        "non_empty_rows": 30
+      },
+      {
+        "sheet": "Trainer and QA person ",
+        "detected_headers": [
+          "Names",
+          "WNS Email Address",
+          "Role"
+        ],
+        "non_empty_rows": 8
+      },
+      {
+        "sheet": "Operations Supervisors",
+        "detected_headers": [
+          "Names",
+          "WNS Email Address",
+          "Role"
+        ],
+        "non_empty_rows": 14
+      },
+      {
+        "sheet": "Org Chart ( All Managers)",
+        "detected_headers": [
+          "Nilesh Daryanani",
+          "",
+          "Maria Theresa Rabosa",
+          "",
+          "",
+          "Shubham Maheshwari",
+          "",
+          "Ruth Gay Calupig",
+          "",
+          "Shoaib Mallik"
+        ],
+        "non_empty_rows": 13
+      }
+    ]
+  },
+  {
+    "file_name": "Copy of Teleperformance Logins.xlsx",
+    "sheets": [
+      {
+        "sheet": "Active",
+        "detected_headers": [
+          "59.0",
+          "20.0",
+          "45705.0",
+          "Voice/Agent",
+          "5751525.0",
+          "Francis Adrian Recile",
+          "Nu\u00f1ez, Jophel S",
+          "recile.10@teleperformanceusa.com",
+          "5751525.0",
+          "-",
+          "Z9$rD8Jt",
+          "Yes",
+          "2422973.0",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 107
+      },
+      {
+        "sheet": "Remove",
+        "detected_headers": [
+          "Wave",
+          "Start Date",
+          "Position",
+          "TP Full Name",
+          "Team Lead",
+          "Email",
+          "Date Deact.Done",
+          "Reason for Deactivation",
+          "Approval",
+          "TP ID*",
+          "TP ID on Tableau",
+          "Password*",
+          "Billable Hour Yes/No",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 267
+      },
+      {
+        "sheet": "Active Support",
+        "detected_headers": [
+          "Department",
+          "Position",
+          "Billable Hour Yes/No",
+          "Admin Access",
+          "ID*",
+          "HP Id",
+          "Last Name",
+          "Name",
+          "Email",
+          "Password*",
+          "Wave",
+          "TP Full Name",
+          "Remarks",
+          "Voice",
+          "Groups",
+          "Tickets",
+          "Call Aheads",
+          "Chat",
+          "Yes/No",
+          ""
+        ],
+        "non_empty_rows": 30
+      },
+      {
+        "sheet": "Zendesk",
+        "detected_headers": [
+          "Name",
+          "Email",
+          "Password",
+          "TP Emp ID",
+          "Status",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 37
+      },
+      {
+        "sheet": "Deactived fr. Intranet",
+        "detected_headers": [
+          "FN",
+          "LN",
+          "EM",
+          "Deact.Date:",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 58
+      },
+      {
+        "sheet": "Keyword",
+        "detected_headers": [
+          "TEP",
+          "3616575.0"
+        ],
+        "non_empty_rows": 55
+      }
+    ]
+  },
+  {
+    "file_name": "Telus Utilization (1).xlsx",
+    "sheets": [
+      {
+        "sheet": "Sheet 1",
+        "detected_headers": [
+          "",
+          "",
+          "",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "20",
+          "Grand Total"
+        ],
+        "non_empty_rows": 104
+      }
+    ]
+  },
+  {
+    "file_name": "Concentrix Logins.xlsx",
+    "sheets": [
+      {
+        "sheet": "Inactive to Deactived fr. Intra",
+        "detected_headers": [
+          "Ma.Eloiza ",
+          "Galeon",
+          "maeloizajane.galeon@concentrix.com",
+          "8/15/24 bk.",
+          "Trainee Fail"
+        ],
+        "non_empty_rows": 7
+      },
+      {
+        "sheet": "CON Master List",
+        "detected_headers": [
+          "Employee ID",
+          "Job Title",
+          "Queue",
+          "Full Legal Name",
+          "Team Leader",
+          "Email",
+          "Wave",
+          "Start Date",
+          "Prod Date",
+          "Status",
+          "HP ID",
+          "Password",
+          "Remarks",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 157
+      },
+      {
+        "sheet": "Deactivated Logins",
+        "detected_headers": [
+          "ID#",
+          "NAME of Agent",
+          "Email",
+          "",
+          "Login PW",
+          "Position",
+          "HP#",
+          "Notes/Reason",
+          "Date of /Who",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 188
+      }
+    ]
+  },
+  {
+    "file_name": "Buwelo Agents .xlsx",
+    "sheets": [
+      {
+        "sheet": "Active Agents - COL",
+        "detected_headers": [
+          "Wave ",
+          "Start Date",
+          "",
+          "Position /LOB",
+          "First Name",
+          "Last Name",
+          "Supervisor",
+          "Email",
+          "Production Start Date",
+          "Start Date Tickets",
+          "Password*",
+          "ID*",
+          "Billable Hour Yes/No",
+          "Admin Access",
+          "Zendesk Logins",
+          "Remarks",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 148
+      },
+      {
+        "sheet": "Active Agents - GH",
+        "detected_headers": [
+          "Wave ",
+          "Start Date",
+          "Position /LOB",
+          "First Name",
+          "Last Name",
+          "Supervisor",
+          "Email",
+          "Production Start Date",
+          "Start Date Tickets",
+          "Password*",
+          "ID*",
+          "Billable Hour Yes/No",
+          "Admin Access",
+          "Remarks",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 84
+      },
+      {
+        "sheet": "Zendesk Logins",
+        "detected_headers": [
+          "CO",
+          "Bryan Galvis",
+          "bryan.galvis@buwelo.com",
+          "fads0987",
+          "45047.0",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 52
+      },
+      {
+        "sheet": "Agents Removed",
+        "detected_headers": [
+          "f",
+          "Task",
+          "Position",
+          "Billable Hour Yes/No",
+          "Admin Access",
+          "ID*",
+          "Name",
+          "Last Name",
+          "Email",
+          "Password*",
+          "Remarks",
+          "Date removed",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 430
+      },
+      {
+        "sheet": "Inactive to Deactived fr. Intra",
+        "detected_headers": [
+          "FN",
+          "LN",
+          "EM",
+          "Deact.Date:"
+        ],
+        "non_empty_rows": 5
+      },
+      {
+        "sheet": "Active Agents - PH",
+        "detected_headers": [
+          "Wave ",
+          "Start Date",
+          "Position",
+          "First Name",
+          "Last Name",
+          "Supervisor",
+          "Email",
+          "Password*",
+          "ID*",
+          "Billable Hour Yes/No",
+          "Admin Access",
+          "Remarks",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "non_empty_rows": 23
+      }
+    ]
+  }
+]

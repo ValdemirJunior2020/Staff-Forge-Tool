@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: staffforge
+      POSTGRES_PASSWORD: staffforge
+      POSTGRES_DB: staffforge
+    ports: ["5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+  server:
+    build: ./server
+    env_file: .env
+    depends_on: [postgres, redis]
+    ports: ["8000:8000"]
+    volumes: ["./data:/app/data"]
+  client:
+    build: ./client
+    env_file: .env
+    depends_on: [server]
+    ports: ["5173:5173"]
+volumes:
+  postgres_data:

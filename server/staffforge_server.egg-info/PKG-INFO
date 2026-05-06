@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: staffforge-server
+Version: 0.1.0
+Requires-Python: >=3.12
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: uvicorn[standard]>=0.30.0
+Requires-Dist: sqlalchemy>=2.0.31
+Requires-Dist: psycopg[binary]>=3.2.1
+Requires-Dist: pydantic>=2.8.2
+Requires-Dist: pydantic-settings>=2.4.0
+Requires-Dist: pandas>=2.2.2
+Requires-Dist: openpyxl>=3.1.5
+Requires-Dist: polars>=1.2.1
+Requires-Dist: redis>=5.0.8
+Requires-Dist: celery>=5.4.0
+Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: email-validator>=2.2.0
