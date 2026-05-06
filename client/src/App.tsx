@@ -11,7 +11,7 @@ import AiPage from "./pages/AiPage";
 import ForecastingPage from "./pages/ForecastingPage";
 import UtilizationPage from "./pages/UtilizationPage";
 import AdminAuditPage from "./pages/AdminAuditPage";
-import PlaceholderPage from "./pages/PlaceholderPage";
+import EtlImportsPage from "./pages/EtlImportsPage";
 import { trackEvent } from "./lib/firebase";
 import { useSessionStore } from "./store/sessionStore";
 
@@ -60,7 +60,7 @@ function Shell() {
     intelligence: <IntelligencePage />,
     forecasting: <ForecastingPage />,
     ai: <AiPage />,
-    imports: <PlaceholderPage title="ETL Import Control Room" />,
+    imports: <EtlImportsPage />,
     admin: <AdminAuditPage />,
   };
 
