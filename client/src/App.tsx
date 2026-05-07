@@ -1,7 +1,7 @@
 // client/src/App.tsx
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./components/layout/Sidebar";
 import LandingGate from "./components/landing/LandingGate";
 import Dashboard from "./pages/Dashboard";
@@ -12,6 +12,9 @@ import ForecastingPage from "./pages/ForecastingPage";
 import UtilizationPage from "./pages/UtilizationPage";
 import AdminAuditPage from "./pages/AdminAuditPage";
 import EtlImportsPage from "./pages/EtlImportsPage";
+import CoverageAuditPage from "./pages/CoverageAuditPage";
+import AuxBreakdownPage from "./pages/AuxBreakdownPage";
+import RedFlagsPage from "./pages/RedFlagsPage";
 import { trackEvent } from "./lib/firebase";
 import { useSessionStore } from "./store/sessionStore";
 
@@ -22,8 +25,14 @@ const ENTRY_GIF =
 
 function CommandCenterEntryLoader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="rounded-4xl border border-slate-200 bg-white p-8 text-center shadow-2xl">
+    <div
+      className="flex min-h-screen items-center justify-center bg-slate-950 bg-cover bg-center p-6"
+      style={{
+        backgroundImage:
+          "linear-gradient(90deg, rgba(2,6,23,0.92), rgba(2,6,23,0.65)), url('/bg.png')",
+      }}
+    >
+      <div className="rounded-4xl border border-slate-200/20 bg-white/95 p-8 text-center shadow-2xl">
         <img
           src={ENTRY_GIF}
           alt="Loading command center"
@@ -57,6 +66,9 @@ function Shell() {
     dashboard: <Dashboard onNavigate={setActive} />,
     agents: <AgentsPage />,
     utilization: <UtilizationPage />,
+    coverage: <CoverageAuditPage />,
+    aux: <AuxBreakdownPage />,
+    redflags: <RedFlagsPage />,
     intelligence: <IntelligencePage />,
     forecasting: <ForecastingPage />,
     ai: <AiPage />,
@@ -77,7 +89,7 @@ function Shell() {
       <Sidebar active={active} onChange={setActive} />
 
       <main className="flex-1 p-4 lg:p-8">
-        <div className="mb-5 flex flex-col justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center">
+        <div className="mb-5 flex flex-col justify-between gap-3 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur md:flex-row md:items-center">
           <div>
             <p className="text-sm font-bold text-blue-700">
               Logged in as {session.fullName}
@@ -106,29 +118,21 @@ function Shell() {
 export default function App() {
   const sessionId = useSessionStore((state) => state.sessionId);
   const [showEntryLoader, setShowEntryLoader] = useState(false);
-  const previousSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    let timer: number | undefined;
-
-    if (sessionId && previousSessionIdRef.current !== sessionId) {
-      setShowEntryLoader(true);
-
-      timer = window.setTimeout(() => {
-        setShowEntryLoader(false);
-      }, 2400);
-    }
-
     if (!sessionId) {
       setShowEntryLoader(false);
+      return;
     }
 
-    previousSessionIdRef.current = sessionId;
+    setShowEntryLoader(true);
+
+    const timer = window.setTimeout(() => {
+      setShowEntryLoader(false);
+    }, 2000);
 
     return () => {
-      if (timer) {
-        window.clearTimeout(timer);
-      }
+      window.clearTimeout(timer);
     };
   }, [sessionId]);
 

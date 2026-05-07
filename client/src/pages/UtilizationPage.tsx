@@ -14,12 +14,35 @@ import {
 } from "lucide-react";
 import { trackEvent } from "../lib/firebase";
 import { getGoogleSheetRows } from "../lib/googleSheetApi";
+import {
+  calculateDataQuality,
+  confidenceFromDataQuality,
+} from "../lib/dataQuality";
+import EvidenceCard, {
+  ConfidenceBadge,
+  DataSourcePill,
+} from "../components/evidence/EvidenceCard";
 
 const LOADING_GIF =
   "https://media1.tenor.com/m/12DuAMmK3dwAAAAC/sofakingdoge.gif";
 
 const GOOGLE_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1QZO61rBDUUbNH-lkWrmhgADjHraZkV4wfZ_cSo0MaD8/edit?usp=sharing";
+
+type AgentMasterRow = {
+  agent_id?: string;
+  hp_id?: string;
+  employee_id?: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  agent_name?: string;
+  vendor?: string;
+  bpo?: string;
+  site?: string;
+  role?: string;
+  status?: string;
+};
 
 type UtilizationRow = {
   date?: string;
@@ -44,6 +67,7 @@ type VendorSummary = {
   idleHours: number;
   utilization: number;
   risk: string;
+  rowCount: number;
 };
 
 function toNumber(value: unknown): number {
@@ -59,6 +83,21 @@ function formatNumber(value: number): string {
   return value.toLocaleString(undefined, {
     maximumFractionDigits: 2,
   });
+}
+
+function getAgentKey(agent: AgentMasterRow): string {
+  return (
+    agent.agent_id ||
+    agent.hp_id ||
+    agent.employee_id ||
+    agent.full_name ||
+    agent.agent_name ||
+    `${agent.first_name || ""} ${agent.last_name || ""}`.trim()
+  );
+}
+
+function getUtilizationAgentKey(row: UtilizationRow): string {
+  return row.agent_id || row.full_name || "";
 }
 
 function getRisk(utilization: number, idleHours: number): string {
@@ -77,6 +116,7 @@ function getRiskClass(risk: string): string {
 }
 
 export default function UtilizationPage() {
+  const [agentRows, setAgentRows] = useState<AgentMasterRow[]>([]);
   const [rows, setRows] = useState<UtilizationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");
@@ -87,19 +127,23 @@ export default function UtilizationPage() {
     setLoading(true);
 
     try {
-      const sheetRows = await getGoogleSheetRows<UtilizationRow>(
-        "Utilization_Daily"
-      );
+      const [masterAgents, utilizationRows] = await Promise.all([
+        getGoogleSheetRows<AgentMasterRow>("Agents_Master"),
+        getGoogleSheetRows<UtilizationRow>("Utilization_Daily"),
+      ]);
 
-      setRows(sheetRows);
+      setAgentRows(masterAgents);
+      setRows(utilizationRows);
       setLastUpdated(new Date().toLocaleString());
 
-      await trackEvent("utilization_daily_loaded", {
-        count: sheetRows.length,
+      await trackEvent("utilization_page_loaded", {
+        masterAgentRows: masterAgents.length,
+        utilizationRows: utilizationRows.length,
         source: "google_sheet",
       });
     } catch (error) {
       console.error("Utilization loading failed:", error);
+      setAgentRows([]);
       setRows([]);
     } finally {
       setLoading(false);
@@ -109,6 +153,42 @@ export default function UtilizationPage() {
   useEffect(() => {
     loadUtilization();
   }, []);
+
+  const dataQuality = useMemo(() => {
+    return calculateDataQuality(rows as Record<string, unknown>[], [
+      "agent_id",
+      "full_name",
+      "vendor",
+      "scheduled_hours",
+      "productive_hours",
+      "idle_hours",
+      "utilization_percent",
+    ]);
+  }, [rows]);
+
+  const confidence = confidenceFromDataQuality(dataQuality.score);
+
+  const masterAgentsTotal = useMemo(() => {
+    const uniqueAgents = new Set(
+      agentRows.map((agent) => getAgentKey(agent)).filter(Boolean)
+    );
+
+    return uniqueAgents.size;
+  }, [agentRows]);
+
+  const activeMasterAgents = useMemo(() => {
+    return agentRows.filter((agent) =>
+      String(agent.status || "").toLowerCase().includes("active")
+    ).length;
+  }, [agentRows]);
+
+  const utilizedAgents = useMemo(() => {
+    const uniqueAgents = new Set(
+      rows.map((row) => getUtilizationAgentKey(row)).filter(Boolean)
+    );
+
+    return uniqueAgents.size;
+  }, [rows]);
 
   const vendorSummaries = useMemo<VendorSummary[]>(() => {
     const grouped = new Map<
@@ -120,6 +200,7 @@ export default function UtilizationPage() {
         idleHours: number;
         utilizationTotal: number;
         utilizationCount: number;
+        rowCount: number;
       }
     >();
 
@@ -135,11 +216,13 @@ export default function UtilizationPage() {
           idleHours: 0,
           utilizationTotal: 0,
           utilizationCount: 0,
+          rowCount: 0,
         });
       }
 
       const bucket = grouped.get(vendor)!;
 
+      bucket.rowCount += 1;
       bucket.agentIds.add(agentId);
       bucket.scheduledHours += toNumber(row.scheduled_hours);
       bucket.productiveHours += toNumber(row.productive_hours);
@@ -170,6 +253,7 @@ export default function UtilizationPage() {
           idleHours: data.idleHours,
           utilization,
           risk: getRisk(utilization, data.idleHours),
+          rowCount: data.rowCount,
         };
       })
       .sort((a, b) => b.idleHours - a.idleHours);
@@ -203,14 +287,6 @@ export default function UtilizationPage() {
 
   const visibleRows = showAllRows ? filteredRows : filteredRows.slice(0, 25);
 
-  const totalAgents = useMemo(() => {
-    const agentIds = new Set(
-      rows.map((row) => row.agent_id || row.full_name).filter(Boolean)
-    );
-
-    return agentIds.size;
-  }, [rows]);
-
   const totalIdleHours = vendorSummaries.reduce(
     (sum, vendor) => sum + vendor.idleHours,
     0
@@ -233,31 +309,52 @@ export default function UtilizationPage() {
       vendor.risk === "Monitor"
   ).length;
 
+  const rowCounts = vendorSummaries.map((vendor) => vendor.rowCount);
+  const maxRows = rowCounts.length ? Math.max(...rowCounts) : 0;
+  const minRows = rowCounts.length ? Math.min(...rowCounts) : 0;
+  const comparisonWarning =
+    maxRows > 0 && minRows > 0 && maxRows / minRows >= 3;
+
   async function handleExport() {
     await trackEvent("utilization_export_clicked", {
-      rows: rows.length,
+      masterAgents: masterAgentsTotal,
+      activeMasterAgents,
+      utilizedAgents,
+      utilizationRows: rows.length,
       vendors: vendorSummaries.length,
+      dataQualityScore: dataQuality.score,
+      confidence: confidence.label,
     });
 
     const headers = [
       "Vendor",
-      "Agents",
+      "Utilized Agents",
+      "Rows",
       "Scheduled Hours",
       "Productive Hours",
       "Idle Hours",
       "Utilization",
       "Risk",
+      "Master Agents Total",
+      "Active Master Agents",
+      "Data Quality Score",
+      "Confidence",
     ];
 
     const csvRows = vendorSummaries.map((row) =>
       [
         row.vendor,
         row.agents,
+        row.rowCount,
         row.scheduledHours,
         row.productiveHours,
         row.idleHours,
         `${row.utilization.toFixed(2)}%`,
         row.risk,
+        masterAgentsTotal,
+        activeMasterAgents,
+        dataQuality.score,
+        confidence.label,
       ].join(",")
     );
 
@@ -278,11 +375,19 @@ export default function UtilizationPage() {
       riskAlerts,
       idleHours: totalIdleHours,
       highestRiskVendor: highestRiskVendor?.vendor || "N/A",
+      evidence: "Agents_Master + Utilization_Daily",
+      dataQualityScore: dataQuality.score,
     });
 
     alert(
-      `Action created: Review ${highestRiskVendor?.vendor || "vendors"} first because this vendor has the highest idle-hour exposure in the current data.`
+      `Action created with evidence: StaffForge found ${masterAgentsTotal} master agents and ${utilizedAgents} utilized agents in the current utilization data. Review ${
+        highestRiskVendor?.vendor || "vendors"
+      } first because this vendor has the highest idle-hour exposure.`
     );
+  }
+
+  function showFormula(title: string, formula: string) {
+    alert(`${title}\n\n${formula}`);
   }
 
   if (loading) {
@@ -300,7 +405,7 @@ export default function UtilizationPage() {
           </h2>
 
           <p className="mt-2 text-sm font-semibold text-slate-500">
-            StaffForge is reading your Google Sheet and calculating vendor risk.
+            StaffForge is reading Agents_Master and Utilization_Daily.
           </p>
         </div>
       </div>
@@ -315,12 +420,12 @@ export default function UtilizationPage() {
         </p>
 
         <h2 className="mt-4 text-4xl font-black">
-          Find idle time, break risk, and staffing gaps by vendor.
+          Evidence-first utilization analysis by vendor.
         </h2>
 
         <p className="mt-4 max-w-4xl text-slate-300">
-          This page reads from your Google Sheet tab <b>Utilization_Daily</b>{" "}
-          and calculates vendor-level utilization.
+          This page uses <b>Agents_Master</b> for total agents and{" "}
+          <b>Utilization_Daily</b> for utilization calculations.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -373,14 +478,49 @@ export default function UtilizationPage() {
         )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-5">
         <div className="sf-card p-5">
           <Users className="mb-3 text-blue-700" />
-          <p className="text-sm font-bold text-slate-500">Total Agents</p>
-          <h3 className="mt-2 text-3xl font-black">{totalAgents}</h3>
-          <p className="mt-2 text-sm text-slate-500">
-            From Utilization_Daily
-          </p>
+          <p className="text-sm font-bold text-slate-500">Master Agents</p>
+          <h3 className="mt-2 text-3xl font-black">{masterAgentsTotal}</h3>
+          <DataSourcePill
+            source="Google Sheet → Agents_Master → unique agent_id/hp_id/full_name"
+            lastUpdated={lastUpdated}
+          />
+          <button
+            type="button"
+            onClick={() =>
+              showFormula(
+                "Master Agents",
+                "Count unique agents from Agents_Master. Google Sheets row count may include the header row, so the app counts usable data rows only."
+              )
+            }
+            className="mt-3 text-sm font-black text-blue-700"
+          >
+            How was this calculated?
+          </button>
+        </div>
+
+        <div className="sf-card p-5">
+          <Users className="mb-3 text-blue-700" />
+          <p className="text-sm font-bold text-slate-500">Utilized Agents</p>
+          <h3 className="mt-2 text-3xl font-black">{utilizedAgents}</h3>
+          <DataSourcePill
+            source="Google Sheet → Utilization_Daily → unique agent_id/full_name"
+            lastUpdated={lastUpdated}
+          />
+          <button
+            type="button"
+            onClick={() =>
+              showFormula(
+                "Utilized Agents",
+                "Count unique agents found in Utilization_Daily. This is not the same as total master agents."
+              )
+            }
+            className="mt-3 text-sm font-black text-blue-700"
+          >
+            How was this calculated?
+          </button>
         </div>
 
         <div className="sf-card p-5">
@@ -389,7 +529,11 @@ export default function UtilizationPage() {
           <h3 className="mt-2 text-3xl font-black">
             {formatNumber(totalIdleHours)}
           </h3>
-          <p className="mt-2 text-sm text-slate-500">Potential wasted time</p>
+          <DataSourcePill
+            source="Google Sheet → Utilization_Daily → idle_hours"
+            formula="SUM(idle_hours)"
+            lastUpdated={lastUpdated}
+          />
         </div>
 
         <div className="sf-card p-5">
@@ -398,51 +542,61 @@ export default function UtilizationPage() {
           <h3 className="mt-2 text-3xl font-black">
             {bestVendor ? bestVendor.vendor : "N/A"}
           </h3>
-          <p className="mt-2 text-sm text-slate-500">
-            {bestVendor
-              ? `${bestVendor.utilization.toFixed(1)}% utilization`
-              : "Needs data"}
-          </p>
+          <DataSourcePill
+            source="Google Sheet → Utilization_Daily"
+            formula="Highest average utilization_percent"
+            lastUpdated={lastUpdated}
+          />
+          {comparisonWarning && (
+            <p className="mt-3 rounded-xl bg-orange-50 p-3 text-xs font-bold text-orange-700">
+              Vendor comparison may be incomplete because vendors have different
+              data volumes.
+            </p>
+          )}
         </div>
 
         <div className="sf-card p-5">
           <AlertTriangle className="mb-3 text-orange-600" />
-          <p className="text-sm font-bold text-slate-500">Risk Alerts</p>
-          <h3 className="mt-2 text-3xl font-black">{riskAlerts}</h3>
-          <p className="mt-2 text-sm text-slate-500">
-            Vendors needing attention
-          </p>
+          <p className="text-sm font-bold text-slate-500">Data Quality Score</p>
+          <h3 className="mt-2 text-3xl font-black">{dataQuality.score}%</h3>
+          <p className="mt-2 text-sm text-slate-500">{dataQuality.level}</p>
+          <ConfidenceBadge
+            label={confidence.label}
+            explanation={confidence.explanation}
+          />
         </div>
       </section>
 
-      <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-950">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-1 text-blue-700" />
-          <div>
-            <h3 className="text-lg font-black">Operational Insight</h3>
-            <p className="mt-1 text-sm leading-6">
-              StaffForge loaded <b>{rows.length}</b> utilization records from
-              Google Sheets and grouped them by vendor. The summary below is for
-              executive review. The detailed records table shows the individual
-              rows behind the calculation.
-            </p>
+      <section className="grid gap-4 lg:grid-cols-2">
+        <EvidenceCard title="Master agent source" type="Verified Data">
+          StaffForge loaded <b>{masterAgentsTotal}</b> usable master agent
+          records from <b>Google Sheet → Agents_Master</b>.
+        </EvidenceCard>
 
-            {highestRiskVendor && (
-              <p className="mt-2 text-sm leading-6">
-                Current priority: <b>{highestRiskVendor.vendor}</b> has the
-                highest idle-hour exposure with{" "}
-                <b>{formatNumber(highestRiskVendor.idleHours)}</b> idle hours.
-              </p>
-            )}
-          </div>
-        </div>
+        <EvidenceCard title="Utilization source" type="Verified Data">
+          StaffForge loaded <b>{rows.length}</b> utilization rows from{" "}
+          <b>Google Sheet → Utilization_Daily</b>. This is why utilized agents
+          may be lower than total master agents.
+        </EvidenceCard>
+
+        <EvidenceCard title="Current operational result" type="Calculated Result">
+          StaffForge calculated <b>{formatNumber(totalIdleHours)}</b> total idle
+          hours across <b>{vendorSummaries.length}</b> vendors using{" "}
+          <b>SUM(idle_hours)</b>.
+        </EvidenceCard>
+
+        <EvidenceCard title="Human review requirement" type="Needs Human Review">
+          Before making staffing decisions, confirm that <b>Schedules</b> and{" "}
+          <b>Call_Volume</b> are complete. Master agent count and utilization
+          count measure different things.
+        </EvidenceCard>
       </section>
 
       <section className="sf-card overflow-hidden">
         <div className="border-b border-slate-200 p-5">
           <h3 className="text-xl font-black">Vendor Utilization Overview</h3>
           <p className="text-sm text-slate-500">
-            Executive summary grouped by vendor.
+            Executive summary grouped by vendor from Utilization_Daily.
           </p>
         </div>
 
@@ -451,7 +605,8 @@ export default function UtilizationPage() {
             <thead className="bg-slate-100 text-slate-600">
               <tr>
                 <th className="p-4">Vendor</th>
-                <th className="p-4">Agents</th>
+                <th className="p-4">Utilized Agents</th>
+                <th className="p-4">Rows</th>
                 <th className="p-4">Scheduled Hours</th>
                 <th className="p-4">Productive Hours</th>
                 <th className="p-4">Idle Hours</th>
@@ -465,6 +620,7 @@ export default function UtilizationPage() {
                 <tr key={row.vendor} className="border-t border-slate-100">
                   <td className="p-4 font-black">{row.vendor}</td>
                   <td className="p-4">{row.agents}</td>
+                  <td className="p-4">{row.rowCount}</td>
                   <td className="p-4">{formatNumber(row.scheduledHours)}</td>
                   <td className="p-4">{formatNumber(row.productiveHours)}</td>
                   <td className="p-4">{formatNumber(row.idleHours)}</td>
@@ -487,7 +643,7 @@ export default function UtilizationPage() {
                 <tr>
                   <td
                     className="p-6 text-center font-semibold text-slate-500"
-                    colSpan={7}
+                    colSpan={8}
                   >
                     No utilization data found. Confirm that the Google Sheet has
                     a tab named Utilization_Daily.
@@ -505,7 +661,7 @@ export default function UtilizationPage() {
             <h3 className="text-xl font-black">Detailed Utilization Records</h3>
             <p className="text-sm text-slate-500">
               Showing {visibleRows.length} of {filteredRows.length} matching
-              rows. Total loaded rows: {rows.length}.
+              rows. Total utilization rows loaded: {rows.length}.
             </p>
           </div>
 
@@ -530,7 +686,7 @@ export default function UtilizationPage() {
           </div>
         </div>
 
-       <div className="max-h-130 overflow-auto">
+        <div className="max-h-130 overflow-auto">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 bg-slate-100 text-slate-600">
               <tr>

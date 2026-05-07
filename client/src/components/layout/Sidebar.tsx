@@ -1,8 +1,11 @@
 // client/src/components/layout/Sidebar.tsx
 
 import {
+  Activity,
+  AlertTriangle,
   Bot,
   Brain,
+  ClipboardList,
   Gauge,
   Home,
   LineChart,
@@ -16,6 +19,9 @@ const items = [
   ["dashboard", "Command Center", Home],
   ["agents", "Master Agents", Users],
   ["utilization", "Utilization", Gauge],
+  ["coverage", "Coverage Audit", ClipboardList],
+  ["aux", "AUX Breakdown", Activity],
+  ["redflags", "Red Flags", AlertTriangle],
   ["intelligence", "Better Engine", Brain],
   ["forecasting", "Forecasting", LineChart],
   ["ai", "AI Assistant", Bot],
@@ -41,14 +47,14 @@ export default function Sidebar({ active, onChange }: SidebarProps) {
   return (
     <aside className="min-h-screen w-72 shrink-0 bg-slate-950 p-4 text-white">
       <div className="mb-8 rounded-3xl bg-white/10 p-4">
-        <p className="text-xs uppercase tracking-[.3em] text-blue-200">
-          StaffForge
-        </p>
+        <img
+          src="/logo.png"
+          alt="StaffForge logo"
+          className="mb-4 h-24 w-full object-contain"
+        />
 
-        <h1 className="mt-2 text-2xl font-black">BPO Command OS</h1>
-
-        <p className="mt-2 text-sm text-slate-300">
-          2035-ready workforce intelligence.
+        <p className="text-center text-xs uppercase tracking-[0.25em] text-blue-200">
+          2035-ready workforce intelligence
         </p>
       </div>
 

@@ -1,7 +1,7 @@
 // client/src/components/landing/LandingGate.tsx
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, Building2, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
 import { apiPost } from "../../lib/api";
 import { createFirebaseSession, trackEvent } from "../../lib/firebase";
 import { useSessionStore } from "../../store/sessionStore";
@@ -13,20 +13,26 @@ export default function LandingGate() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!fullName.trim()) {
+      setErrorMessage("Please enter your name before opening StaffForge.");
+      return;
+    }
+
     setLoading(true);
     setErrorMessage("");
 
     try {
       const firebaseSessionId = await createFirebaseSession({
-        fullName,
+        fullName: fullName.trim(),
         tenantKey: "hotelplanner",
         userAgent: navigator.userAgent,
       });
 
       const apiSession = await apiPost<{ id: string }>("/sessions", {
-        full_name: fullName,
+        full_name: fullName.trim(),
         tenant_key: "hotelplanner",
         user_agent: navigator.userAgent,
       });
@@ -36,12 +42,12 @@ export default function LandingGate() {
 
       setSession({
         sessionId: finalSessionId,
-        fullName,
+        fullName: fullName.trim(),
       });
 
       await trackEvent("staffforge_landing_entered", {
         sessionId: finalSessionId,
-        fullName,
+        fullName: fullName.trim(),
       });
     } catch (error) {
       console.error(error);
@@ -54,12 +60,22 @@ export default function LandingGate() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-slate-950 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563eb55,transparent_30%),radial-gradient(circle_at_bottom_right,#14b8a655,transparent_25%)]" />
-
+    <main
+      className="relative min-h-screen overflow-hidden bg-slate-950 bg-cover bg-center text-white"
+      style={{
+        backgroundImage:
+          "linear-gradient(90deg, rgba(2,6,23,0.92), rgba(2,6,23,0.58)), url('/bg.png')",
+      }}
+    >
       <section className="relative mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-6 py-10 lg:grid-cols-[1.1fr_.9fr]">
         <div>
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-blue-100">
+          <img
+            src="/logo.png"
+            alt="StaffForge logo"
+            className="mb-8 h-28 w-auto drop-shadow-2xl"
+          />
+
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-blue-100 backdrop-blur">
             <Sparkles size={16} />
             Workforce Intelligence Platform
           </div>
@@ -77,7 +93,7 @@ export default function LandingGate() {
             {["Multi-vendor ready", "AI-native", "Audit-first"].map((item) => (
               <div
                 key={item}
-                className="rounded-2xl border border-white/10 bg-white/10 p-4"
+                className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur"
               >
                 <ShieldCheck className="mb-3 text-blue-200" />
                 <b>{item}</b>
@@ -90,21 +106,23 @@ export default function LandingGate() {
           onSubmit={submit}
           className="rounded-4xl border border-white/15 bg-white/95 p-8 text-slate-950 shadow-2xl"
         >
-          <div className="mb-6 flex items-center gap-3">
-            <div className="rounded-2xl bg-blue-600 p-3 text-white">
-              <Building2 />
-            </div>
+          <div className="mb-6 text-center">
+            <img
+              src="/logo.png"
+              alt="StaffForge logo"
+              className="mx-auto mb-5 h-24 w-auto"
+            />
 
-            <div>
-              <h2 className="text-2xl font-black">Enter StaffForge</h2>
-              <p className="text-sm text-slate-500">
-                Enter your name to open the command center.
-              </p>
-            </div>
+            <h2 className="text-2xl font-black">Enter StaffForge</h2>
+
+            <p className="text-sm text-slate-500">
+              Enter your name, then click ENTER.
+            </p>
           </div>
 
           <label className="mb-4 block">
             <span className="text-sm font-bold">Full Name</span>
+
             <input
               required
               type="text"
@@ -124,10 +142,10 @@ export default function LandingGate() {
           <button
             type="submit"
             disabled={loading}
-            className="sf-button sf-primary w-full py-4 disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl bg-yellow-400 px-6 py-4 text-lg font-black uppercase tracking-wide text-slate-950 shadow-lg shadow-yellow-500/30 transition hover:scale-[1.02] hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {loading ? "Opening Command Center..." : "Launch Command Center"}
-            <ArrowRight size={18} />
+            {loading ? "Opening..." : "ENTER"}
+            <ArrowRight size={22} />
           </button>
         </form>
       </section>
